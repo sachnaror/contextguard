@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import re
 from pathlib import Path
 
@@ -13,6 +14,8 @@ STOPWORDS = {
     "and",
     "are",
     "can",
+    "control",
+    "controls",
     "does",
     "file",
     "files",
@@ -48,12 +51,26 @@ def prompt_terms(prompt: str) -> set[str]:
 
 
 def score_row(row, terms: set[str]) -> int:
-    haystack = "\n".join(
-        [row["path"], row["summary"], row["keywords"], row["classes"], row["functions"]]
-    ).lower()
-    score = sum(5 for term in terms if term in row["path"].lower())
-    score += sum(3 for term in terms if term in row["classes"].lower() or term in row["functions"].lower())
-    score += sum(1 for term in terms if term in haystack)
+    path = row["path"].lower()
+    keywords = set(row["keywords"].lower().splitlines())
+    symbols = set(row["classes"].lower().splitlines()) | set(row["functions"].lower().splitlines())
+    summary_terms = {word.lower() for word in WORD_RE.findall(row["summary"])}
+
+    score = sum(5 for term in terms if term in path)
+    score += sum(3 for term in terms if term in symbols)
+    score += sum(2 for term in terms if term in keywords)
+    score += sum(1 for term in terms if term in summary_terms)
+
+    compact_text = re.sub(
+        r"[^a-z0-9]+",
+        "",
+        "\n".join([row["path"], row["summary"], row["keywords"], row["classes"], row["functions"]]).lower(),
+    )
+    for ordered_terms in itertools.permutations(terms, 2):
+        if "".join(ordered_terms) in compact_text:
+            score += 6
+            break
+
     if {"style", "css"} & terms and row["path"].endswith(".css"):
         score += 8
     if {"docker", "container", "image"} & terms and row["path"].lower().endswith("dockerfile"):
@@ -61,6 +78,14 @@ def score_row(row, terms: set[str]) -> int:
     if any(term in row["path"].lower() for term in ("auth", "user", "api", "cache", "config", "setting")):
         score += 1
     return score
+
+
+def prune_weak_matches(candidates: list[tuple[int, dict]]) -> list[tuple[int, dict]]:
+    if not candidates:
+        return []
+    top_score = candidates[0][0]
+    cutoff = max(2, int(top_score * 0.35))
+    return [(score, item) for score, item in candidates if score >= cutoff]
 
 
 def select_context(
@@ -103,6 +128,7 @@ def select_context(
             candidates.append((score, merged))
 
     candidates.sort(key=lambda item: (-item[0], item[1]["tokens"], item[1]["path"]))
+    candidates = prune_weak_matches(candidates)
     selected = []
     used = 0
     for _, item in candidates:
