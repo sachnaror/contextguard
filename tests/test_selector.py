@@ -59,3 +59,10 @@ def test_contact_form_prompt_keeps_contact_page_and_js_handler():
         "contact.html",
         "js/main.js",
     ]
+
+
+def test_prune_fallback_can_use_original_candidates_when_all_are_weak():
+    weak = {"path": "README.md"}
+    ranked = [(1, weak)]
+
+    assert prune_weak_matches(ranked) == []

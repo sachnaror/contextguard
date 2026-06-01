@@ -17,6 +17,12 @@ pip install -e .
 contextguardrail init
 contextguardrail index /path/to/repo
 contextguardrail ask "Where is authentication handled?"
+contextguardrail pack "Where is authentication handled?"
+contextguardrail diff "Where is authentication handled?"
+contextguardrail explain "Where is authentication handled?"
+contextguardrail inspect app.py
+contextguardrail related app.py
+contextguardrail doctor
 contextguardrail stats
 contextguardrail export
 contextguardrail clean
@@ -29,13 +35,19 @@ All state is stored in the indexed repo under `.contextguardrail/`.
 - Repo scanner with incremental hashing
 - Supported file scanning for `.py`, `.md`, `.css`, `.js`, `.html`, `.txt`, `.env`, `Dockerfile`, `.example`, and `.json`
 - Python AST parser for imports, classes, functions, and summaries
+- Lightweight JS, HTML, and CSS parser for functions, linked assets, tags, IDs, classes, and selectors
 - Lightweight dependency graph
-- Context selector using prompt keywords and graph metadata
+- Context selector using prompt keywords, graph metadata, file type boosts, exact keyword matching, and weak-match pruning
 - Token counting with `tiktoken` when available, word-count fallback otherwise
 - Semantic cache for repeated prompt and selected-file sets
 - Replay prevention so already-sent files are skipped unless changed
 - Context diffing via file hashes
 - Cost observability through `contextguardrail stats`
+- AI-ready context packs for Codex, Copilot, Claude, and ChatGPT through `contextguardrail pack`
+- `markdown`, `json`, and `xml` pack output formats
+- Hard context budgets with `--max-tokens`
+- Optional redaction for secrets and local policy files
+- Git diff, PR range, memory, inspect, related, benchmark, batch, and local API workflows
 
 This version intentionally skips dashboards, multi-user support, Neo4j, and agent orchestration.
 
@@ -57,6 +69,57 @@ Dockerfile
 ```
 
 `Dockerfile` is matched by filename, so it works even though it has no extension. `.env` and `.example` files are matched by suffix, which covers files like `.env`, `.env.example`, and `settings.example`.
+
+## AI Tool Workflow
+
+Use ContextGuardrail before opening a large task in Codex, Copilot, Claude, or ChatGPT:
+
+```bash
+contextguardrail index .
+contextguardrail ask "Which files control page styling?"
+contextguardrail pack "Which files control page styling?" --format markdown
+contextguardrail pack "Which files control page styling?" --format json
+contextguardrail pack "Which files control page styling?" --format xml
+```
+
+`ask` prints the files to inspect first, plus raw vs optimized token estimates. `pack` prints an AI-ready bundle with selected files, scores, reasons, and summaries. Add `--full-files` when you want a copy/paste bundle containing the selected source content too:
+
+```bash
+contextguardrail pack "Where is the contact form handled?" --full-files
+```
+
+For follow-up prompts, use:
+
+```bash
+contextguardrail diff "Where is the contact form handled?"
+```
+
+That shows only selected files that changed since the prompt was last sent.
+
+Useful advanced commands:
+
+```bash
+contextguardrail explain "Add Redis cache to user API"
+contextguardrail inspect app/main.py
+contextguardrail related templates/index.html
+contextguardrail pr origin/main...HEAD
+contextguardrail benchmark prompts.txt
+contextguardrail batch tasks.json
+contextguardrail memory
+contextguardrail doctor
+contextguardrail instructions
+contextguardrail serve
+```
+
+Create `.contextguardrailignore` to exclude files from indexing, and `.contextguardrailpolicy.json` for simple local policy controls:
+
+```json
+{
+  "allow_secrets": false,
+  "max_file_tokens": 50000,
+  "forbidden_paths": ["secrets/**"]
+}
+```
 
 
 ## Project Layout

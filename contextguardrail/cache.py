@@ -40,6 +40,12 @@ def already_sent(repo: str | Path, prompt: str) -> dict[str, str]:
     return json.loads(row["file_hashes"]) if row else {}
 
 
+def replay_entries(repo: str | Path) -> list[dict]:
+    with connect(repo, "cache.db") as db:
+        rows = db.execute("SELECT prompt_hash, files, file_hashes, created_at FROM replay ORDER BY created_at DESC").fetchall()
+    return [dict(row) for row in rows]
+
+
 def remember_sent(repo: str | Path, prompt: str, files: list[dict]) -> None:
     file_hashes = {item["path"]: item["hash"] for item in files}
     with connect(repo, "cache.db") as db:

@@ -12,6 +12,7 @@ from contextguardrail.config import (
     repo_root,
 )
 from contextguardrail.graph import parse_file, summarize_file, upsert_symbols
+from contextguardrail.policy import has_secret, is_ignored, load_ignore_patterns, load_policy, redact_text
 from contextguardrail.storage import connect, init_storage
 
 
@@ -19,8 +20,10 @@ def file_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def should_scan(path: Path, rel_path: Path) -> bool:
+def should_scan(path: Path, rel_path: Path, ignore_patterns: list[str] | None = None) -> bool:
     if any(part in SKIP_DIRS for part in rel_path.parts):
+        return False
+    if ignore_patterns and is_ignored(rel_path.as_posix(), ignore_patterns):
         return False
     if not path.is_file():
         return False
@@ -28,8 +31,9 @@ def should_scan(path: Path, rel_path: Path) -> bool:
 
 
 def iter_files(root: Path):
+    ignore_patterns = load_ignore_patterns(root)
     for path in root.rglob("*"):
-        if should_scan(path, path.relative_to(root)):
+        if should_scan(path, path.relative_to(root), ignore_patterns):
             yield path
 
 
@@ -41,10 +45,13 @@ def index_repo(path: str | Path = ".", incremental: bool = False) -> dict[str, i
     root = repo_root(path)
     state = ensure_state(root)
     init_storage(root)
+    policy = load_policy(root)
 
     scanned = changed = skipped = raw_tokens = 0
+    seen_paths: set[str] = set()
     for file_path in iter_files(root):
         rel_path = file_path.relative_to(root).as_posix()
+        seen_paths.add(rel_path)
         digest = file_hash(file_path)
         stat = file_path.stat()
         with connect(root, "hashes.db") as db:
@@ -55,6 +62,11 @@ def index_repo(path: str | Path = ".", incremental: bool = False) -> dict[str, i
 
         text = read_text(file_path)
         tokens = estimate_tokens(text)
+        if tokens > policy["max_file_tokens"]:
+            skipped += 1
+            continue
+        if has_secret(text) and not policy["allow_secrets"]:
+            text = redact_text(text)
         parsed = parse_file(file_path, rel_path, text)
         summary = summarize_file(rel_path, text, parsed)
         summary_path = state / "summaries" / f"{hashlib.sha256(rel_path.encode()).hexdigest()}.md"
@@ -79,6 +91,14 @@ def index_repo(path: str | Path = ".", incremental: bool = False) -> dict[str, i
         scanned += 1
         changed += 1
         raw_tokens += tokens
+
+    with connect(root, "hashes.db") as db:
+        known_paths = [row["path"] for row in db.execute("SELECT path FROM files").fetchall()]
+        for known_path in known_paths:
+            if known_path not in seen_paths:
+                db.execute("DELETE FROM files WHERE path = ?", (known_path,))
+                with connect(root, "graph.db") as graph_db:
+                    graph_db.execute("DELETE FROM symbols WHERE path = ?", (known_path,))
 
     return {
         "files_scanned": scanned,

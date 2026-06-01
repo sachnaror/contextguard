@@ -29,11 +29,23 @@ CODE_EXTENSIONS = {
     ".md",
     ".css",
     ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
     ".html",
     ".txt",
     ".env",
     ".example",
     ".json",
+    ".yaml",
+    ".yml",
+    ".tf",
+    ".tfvars",
+    ".sql",
+    ".go",
+    ".java",
+    ".rb",
+    ".php",
 }
 
 CODE_FILENAMES = {

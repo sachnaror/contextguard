@@ -20,8 +20,6 @@ STOPWORDS = {
     "file",
     "files",
     "for",
-    "handled",
-    "handles",
     "how",
     "into",
     "page",
@@ -35,6 +33,9 @@ STOPWORDS = {
     "with",
 }
 ALIASES = {
+    "handled": "submit",
+    "handles": "submit",
+    "handling": "submit",
     "styling": "style",
     "styled": "style",
     "styles": "style",
@@ -78,6 +79,27 @@ def score_row(row, terms: set[str]) -> int:
     if any(term in row["path"].lower() for term in ("auth", "user", "api", "cache", "config", "setting")):
         score += 1
     return score
+
+
+def explain_row(row, terms: set[str]) -> str:
+    path = row["path"].lower()
+    keywords = set(row["keywords"].lower().splitlines())
+    symbols = set(row["classes"].lower().splitlines()) | set(row["functions"].lower().splitlines())
+    reasons = []
+    path_hits = sorted(term for term in terms if term in path)
+    symbol_hits = sorted(term for term in terms if term in symbols)
+    keyword_hits = sorted(term for term in terms if term in keywords)
+    if path_hits:
+        reasons.append("path: " + ", ".join(path_hits))
+    if symbol_hits:
+        reasons.append("symbol: " + ", ".join(symbol_hits))
+    if keyword_hits:
+        reasons.append("keyword: " + ", ".join(keyword_hits[:5]))
+    if {"style", "css"} & terms and row["path"].endswith(".css"):
+        reasons.append("stylesheet")
+    if {"docker", "container", "image"} & terms and row["path"].lower().endswith("dockerfile"):
+        reasons.append("dockerfile")
+    return "; ".join(reasons) or "related keywords"
 
 
 def prune_weak_matches(candidates: list[tuple[int, dict]]) -> list[tuple[int, dict]]:
@@ -125,10 +147,13 @@ def select_context(
         }
         score = score_row(merged, terms)
         if score > 0:
+            merged["score"] = score
+            merged["reason"] = explain_row(merged, terms)
             candidates.append((score, merged))
 
     candidates.sort(key=lambda item: (-item[0], item[1]["tokens"], item[1]["path"]))
-    candidates = prune_weak_matches(candidates)
+    ranked_candidates = candidates
+    candidates = prune_weak_matches(ranked_candidates)
     selected = []
     used = 0
     for _, item in candidates:
@@ -141,5 +166,5 @@ def select_context(
             break
 
     if not selected:
-        selected = [item for _, item in candidates[:5]]
+        selected = [item for _, item in ranked_candidates[:5]]
     return selected, raw_tokens
