@@ -41,6 +41,7 @@ This version intentionally skips dashboards, multi-user support, Neo4j, and agen
 
 ## DIR Features
 
+```
 contextguard/
 ├── pyproject.toml              # Package metadata, dependencies, CLI entrypoints
 ├── README.md                   # Project documentation and usage guide
@@ -81,3 +82,5 @@ contextguard/
 │   ├── cli.py                  # Main CLI commands exposed to users
 │   ├── stats.py                # Usage metrics and cost-saving reports
 │   └── storage.py              # SQLite helpers and persistence layer
+
+```
