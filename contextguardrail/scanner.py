@@ -4,7 +4,13 @@ import hashlib
 from pathlib import Path
 
 from contextguardrail.budget import estimate_tokens
-from contextguardrail.config import CODE_EXTENSIONS, SKIP_DIRS, ensure_state, repo_root
+from contextguardrail.config import (
+    CODE_EXTENSIONS,
+    CODE_FILENAMES,
+    SKIP_DIRS,
+    ensure_state,
+    repo_root,
+)
 from contextguardrail.graph import parse_file, summarize_file, upsert_symbols
 from contextguardrail.storage import connect, init_storage
 
@@ -16,7 +22,9 @@ def file_hash(path: Path) -> str:
 def should_scan(path: Path, rel_path: Path) -> bool:
     if any(part in SKIP_DIRS for part in rel_path.parts):
         return False
-    return path.is_file() and path.suffix.lower() in CODE_EXTENSIONS
+    if not path.is_file():
+        return False
+    return path.suffix.lower() in CODE_EXTENSIONS or path.name.lower() in CODE_FILENAMES
 
 
 def iter_files(root: Path):

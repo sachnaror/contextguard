@@ -8,10 +8,43 @@ from contextguardrail.storage import connect
 
 
 WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]+")
+STOPWORDS = {
+    "add",
+    "and",
+    "are",
+    "can",
+    "does",
+    "file",
+    "files",
+    "for",
+    "handled",
+    "handles",
+    "how",
+    "into",
+    "page",
+    "pages",
+    "the",
+    "this",
+    "to",
+    "what",
+    "where",
+    "which",
+    "with",
+}
+ALIASES = {
+    "styling": "style",
+    "styled": "style",
+    "styles": "style",
+}
 
 
 def prompt_terms(prompt: str) -> set[str]:
-    return {word.lower() for word in WORD_RE.findall(prompt) if len(word) > 2}
+    terms = set()
+    for word in WORD_RE.findall(prompt):
+        term = ALIASES.get(word.lower(), word.lower())
+        if len(term) > 2 and term not in STOPWORDS:
+            terms.add(term)
+    return terms
 
 
 def score_row(row, terms: set[str]) -> int:
@@ -21,6 +54,10 @@ def score_row(row, terms: set[str]) -> int:
     score = sum(5 for term in terms if term in row["path"].lower())
     score += sum(3 for term in terms if term in row["classes"].lower() or term in row["functions"].lower())
     score += sum(1 for term in terms if term in haystack)
+    if {"style", "css"} & terms and row["path"].endswith(".css"):
+        score += 8
+    if {"docker", "container", "image"} & terms and row["path"].lower().endswith("dockerfile"):
+        score += 8
     if any(term in row["path"].lower() for term in ("auth", "user", "api", "cache", "config", "setting")):
         score += 1
     return score

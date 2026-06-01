@@ -26,32 +26,18 @@ SKIP_DIRS = {
 
 CODE_EXTENSIONS = {
     ".py",
-    ".js",
-    ".jsx",
-    ".ts",
-    ".tsx",
-    ".go",
-    ".java",
-    ".rs",
-    ".rb",
-    ".php",
-    ".c",
-    ".cc",
-    ".cpp",
-    ".h",
-    ".hpp",
-    ".cs",
-    ".swift",
-    ".kt",
-    ".kts",
-    ".scala",
-    ".sh",
-    ".sql",
-    ".yaml",
-    ".yml",
-    ".json",
-    ".toml",
     ".md",
+    ".css",
+    ".js",
+    ".html",
+    ".txt",
+    ".env",
+    ".example",
+    ".json",
+}
+
+CODE_FILENAMES = {
+    "dockerfile",
 }
 
 

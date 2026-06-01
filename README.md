@@ -27,6 +27,7 @@ All state is stored in the indexed repo under `.contextguardrail/`.
 ## MVP Features
 
 - Repo scanner with incremental hashing
+- Supported file scanning for `.py`, `.md`, `.css`, `.js`, `.html`, `.txt`, `.env`, `Dockerfile`, `.example`, and `.json`
 - Python AST parser for imports, classes, functions, and summaries
 - Lightweight dependency graph
 - Context selector using prompt keywords and graph metadata
@@ -37,6 +38,25 @@ All state is stored in the indexed repo under `.contextguardrail/`.
 - Cost observability through `contextguardrail stats`
 
 This version intentionally skips dashboards, multi-user support, Neo4j, and agent orchestration.
+
+## Supported Files
+
+ContextGuardrail indexes common application, documentation, config, and deployment files:
+
+```text
+.py
+.md
+.css
+.js
+.html
+.txt
+.env
+Dockerfile
+.example
+.json
+```
+
+`Dockerfile` is matched by filename, so it works even though it has no extension. `.env` and `.example` files are matched by suffix, which covers files like `.env`, `.env.example`, and `settings.example`.
 
 
 ## Project Layout
