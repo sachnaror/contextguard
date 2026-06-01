@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from contextguard.config import DEFAULT_BUDGET
-from contextguard.storage import connect
+from contextguardrail.config import DEFAULT_BUDGET
+from contextguardrail.storage import connect
 
 
 WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]+")

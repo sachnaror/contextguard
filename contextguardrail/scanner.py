@@ -3,10 +3,10 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from contextguard.budget import estimate_tokens
-from contextguard.config import CODE_EXTENSIONS, SKIP_DIRS, ensure_state, repo_root
-from contextguard.graph import parse_file, summarize_file, upsert_symbols
-from contextguard.storage import connect, init_storage
+from contextguardrail.budget import estimate_tokens
+from contextguardrail.config import CODE_EXTENSIONS, SKIP_DIRS, ensure_state, repo_root
+from contextguardrail.graph import parse_file, summarize_file, upsert_symbols
+from contextguardrail.storage import connect, init_storage
 
 
 def file_hash(path: Path) -> str:

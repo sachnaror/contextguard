@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from contextguard.config import ensure_state
-from contextguard.graph import load_graph
-from contextguard.storage import connect, load_stats
+from contextguardrail.config import ensure_state
+from contextguardrail.graph import load_graph
+from contextguardrail.storage import connect, load_stats
 
 
 def export_repo(repo: str | Path = ".") -> list[Path]:

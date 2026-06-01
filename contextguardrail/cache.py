@@ -4,7 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from contextguard.storage import connect
+from contextguardrail.storage import connect
 
 
 def cache_key(prompt: str, selected_hash: str, model: str) -> str:

@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from contextguard.config import ensure_state
+from contextguardrail.config import ensure_state
 
 
 def db_path(repo: str | Path, name: str) -> Path:

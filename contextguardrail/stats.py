@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from contextguard.budget import cost_usd
-from contextguard.storage import load_stats, save_stats
+from contextguardrail.budget import cost_usd
+from contextguardrail.storage import load_stats, save_stats
 
 
 def record_request(

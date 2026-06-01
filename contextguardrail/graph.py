@@ -7,7 +7,7 @@ from typing import Any
 
 import networkx as nx
 
-from contextguard.storage import connect
+from contextguardrail.storage import connect
 
 
 WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]+")

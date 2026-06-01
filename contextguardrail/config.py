@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-STATE_DIR = ".contextguard"
+STATE_DIR = ".contextguardrail"
 DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_BUDGET = 8_000
 
@@ -18,7 +18,7 @@ SKIP_DIRS = {
     "node_modules",
     "dist",
     "build",
-    ".contextguard",
+    ".contextguardrail",
     ".pytest_cache",
     ".mypy_cache",
     ".ruff_cache",

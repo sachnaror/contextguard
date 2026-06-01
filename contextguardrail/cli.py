@@ -6,8 +6,8 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from contextguard.budget import cost_usd
-from contextguard.cache import (
+from contextguardrail.budget import cost_usd
+from contextguardrail.cache import (
     already_sent,
     cache_key,
     clean_cache,
@@ -16,13 +16,13 @@ from contextguard.cache import (
     selected_files_hash,
     set_cache,
 )
-from contextguard.config import DEFAULT_BUDGET, DEFAULT_MODEL, ensure_state, repo_root
-from contextguard.exporter import export_repo
-from contextguard.graph import graph_counts
-from contextguard.scanner import index_repo
-from contextguard.selector import select_context
-from contextguard.stats import record_request, show_stats
-from contextguard.storage import init_storage
+from contextguardrail.config import DEFAULT_BUDGET, DEFAULT_MODEL, ensure_state, repo_root
+from contextguardrail.exporter import export_repo
+from contextguardrail.graph import graph_counts
+from contextguardrail.scanner import index_repo
+from contextguardrail.selector import select_context
+from contextguardrail.stats import record_request, show_stats
+from contextguardrail.storage import init_storage
 
 app = typer.Typer(help="Local-first token firewall for AI coding agents.")
 console = Console()
@@ -30,7 +30,7 @@ console = Console()
 
 @app.command()
 def init(path: str = typer.Argument(".")):
-    """Create .contextguard storage for a repo."""
+    """Create .contextguardrail storage for a repo."""
     root = repo_root(path)
     init_storage(root)
     console.print(f"[green]Initialized[/green] {ensure_state(root)}")
@@ -112,7 +112,7 @@ def analyze(
 def stats(path: str = typer.Argument(".")):
     """Show token and cache savings."""
     data = show_stats(repo_root(path))
-    table = Table(title="ContextGuard Stats")
+    table = Table(title="ContextGuardrail Stats")
     table.add_column("Metric")
     table.add_column("Value", justify="right")
     table.add_row("Requests", f"{data['requests']:,}")
