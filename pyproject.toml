@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "contextguard"
+version = "0.1.0"
+description = "Local-first token firewall for AI coding agents"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "typer>=0.12",
+  "rich>=13.0",
+  "networkx>=3.0",
+  "tiktoken>=0.7"
+]
+
+[project.scripts]
+contextguard = "contextguard.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["contextguard*"]
