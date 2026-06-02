@@ -50,6 +50,7 @@ CODE_EXTENSIONS = {
 
 CODE_FILENAMES = {
     "dockerfile",
+    ".env",
 }
 
 
