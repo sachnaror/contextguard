@@ -15,6 +15,28 @@ dependencies = [
   "tiktoken>=0.7"
 ]
 
+[project.optional-dependencies]
+treesitter = [
+  "tree-sitter>=0.22",
+  "tree-sitter-language-pack>=0.7"
+]
+embeddings = [
+  "sentence-transformers>=3.0"
+]
+langgraph = [
+  "langgraph>=0.2"
+]
+neo4j = [
+  "neo4j>=5.0"
+]
+all = [
+  "tree-sitter>=0.22",
+  "tree-sitter-language-pack>=0.7",
+  "sentence-transformers>=3.0",
+  "langgraph>=0.2",
+  "neo4j>=5.0"
+]
+
 [project.scripts]
 contextguardrail = "contextguardrail.cli:app"
 

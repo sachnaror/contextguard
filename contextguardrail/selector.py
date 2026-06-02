@@ -5,6 +5,9 @@ import re
 from pathlib import Path
 
 from contextguardrail.config import DEFAULT_BUDGET
+from contextguardrail.gitutils import changed_files, file_commit_count, file_recency
+from contextguardrail.graph import load_graph
+from contextguardrail.semantic import cosine_similarity
 from contextguardrail.storage import connect
 
 
@@ -81,6 +84,35 @@ def score_row(row, terms: set[str]) -> int:
     return score
 
 
+def rank_score(row, terms: set[str], prompt: str, graph, git_changed: set[str], repo: str | Path) -> tuple[float, list[str]]:
+    keyword_score = float(score_row(row, terms))
+    semantic_score = cosine_similarity(prompt, "\n".join([row["path"], row["summary"], row["keywords"]])) * 25
+    if terms == {"style"} and not row["path"].endswith(".css") and "style" not in row["path"].lower():
+        keyword_score *= 0.2
+        semantic_score *= 0.2
+    graph_score = 0.0
+    if row["path"] in graph and (keyword_score >= 3 or semantic_score >= 3 or row["path"] in git_changed):
+        graph_score = min(10.0, graph.degree(row["path"]) * 0.75)
+        if any(neighbor in git_changed for neighbor in set(graph.successors(row["path"])) | set(graph.predecessors(row["path"]))):
+            graph_score += 6
+    git_score = 12.0 if row["path"] in git_changed else 0.0
+    recency_score = file_recency(repo, row["path"]) * 8
+    churn_score = min(6.0, file_commit_count(repo, row["path"]) * 0.6)
+    if keyword_score < 1 and semantic_score < 1 and not git_score:
+        recency_score = 0.0
+        churn_score = 0.0
+    total = keyword_score + semantic_score + graph_score + git_score + recency_score + churn_score
+    reasons = [
+        f"keyword={keyword_score:.1f}",
+        f"semantic={semantic_score:.1f}",
+        f"graph={graph_score:.1f}",
+        f"git={git_score:.1f}",
+        f"recency={recency_score:.1f}",
+        f"churn={churn_score:.1f}",
+    ]
+    return total, reasons
+
+
 def explain_row(row, terms: set[str]) -> str:
     path = row["path"].lower()
     keywords = set(row["keywords"].lower().splitlines())
@@ -118,6 +150,8 @@ def select_context(
 ) -> tuple[list[dict], int]:
     terms = prompt_terms(prompt)
     exclude_unchanged = exclude_unchanged or {}
+    graph = load_graph(repo)
+    git_changed = changed_files(repo)
     with connect(repo, "hashes.db") as files_db, connect(repo, "graph.db") as graph_db:
         rows = files_db.execute(
             "SELECT path, hash, tokens, summary FROM files ORDER BY path"
@@ -145,10 +179,10 @@ def select_context(
             "functions": symbol["functions"] if symbol else "",
             "keywords": symbol["keywords"] if symbol else "",
         }
-        score = score_row(merged, terms)
+        score, rank_reasons = rank_score(merged, terms, prompt, graph, git_changed, repo)
         if score > 0:
             merged["score"] = score
-            merged["reason"] = explain_row(merged, terms)
+            merged["reason"] = explain_row(merged, terms) + "; " + ", ".join(rank_reasons)
             candidates.append((score, merged))
 
     candidates.sort(key=lambda item: (-item[0], item[1]["tokens"], item[1]["path"]))

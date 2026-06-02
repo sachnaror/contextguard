@@ -66,6 +66,18 @@ def init_storage(repo: str | Path = ".") -> None:
             )
             """
         )
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS topic_memory(
+                topic_key TEXT PRIMARY KEY,
+                prompt TEXT NOT NULL,
+                terms TEXT NOT NULL,
+                files TEXT NOT NULL,
+                hits INTEGER NOT NULL DEFAULT 1,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
     stats_file(repo).write_text(
         json.dumps(load_stats(repo), indent=2) + "\n", encoding="utf-8"
     )

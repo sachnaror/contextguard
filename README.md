@@ -11,6 +11,14 @@ source .venv/bin/activate
 pip install -e .
 ```
 
+Optional advanced parsers and semantic ranking:
+
+```bash
+pip install -e ".[treesitter]"
+pip install -e ".[embeddings]"
+pip install -e ".[all]"
+```
+
 ## Use
 
 ```bash
@@ -48,6 +56,12 @@ All state is stored in the indexed repo under `.contextguardrail/`.
 - Hard context budgets with `--max-tokens`
 - Optional redaction for secrets and local policy files
 - Git diff, PR range, memory, inspect, related, benchmark, batch, and local API workflows
+- Tree-sitter parser backend when `contextguardrail[treesitter]` is installed
+- Semantic ranking with local embeddings when `contextguardrail[embeddings]` is installed
+- Ranking v2 blends keyword/symbol matches, semantic similarity, graph signals, git changes, recency, and churn
+- Blast radius analysis for affected files, APIs, and tests
+- Prompt optimizer and LLM router
+- Heatmap and upgraded repo doctor for token hot spots
 
 This version intentionally skips dashboards, multi-user support, Neo4j, and agent orchestration.
 
@@ -100,6 +114,10 @@ Useful advanced commands:
 
 ```bash
 contextguardrail explain "Add Redis cache to user API"
+contextguardrail optimize-prompt "Add Redis cache to user API"
+contextguardrail router "Refactor auth architecture"
+contextguardrail blast-radius app/models.py
+contextguardrail heatmap
 contextguardrail inspect app/main.py
 contextguardrail related templates/index.html
 contextguardrail pr origin/main...HEAD
@@ -108,6 +126,9 @@ contextguardrail batch tasks.json
 contextguardrail memory
 contextguardrail doctor
 contextguardrail instructions
+contextguardrail orchestrate "Add OAuth support"
+contextguardrail langgraph-template
+contextguardrail neo4j-export
 contextguardrail serve
 ```
 

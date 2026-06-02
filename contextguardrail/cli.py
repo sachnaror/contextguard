@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from contextguardrail.budget import cost_usd
+from contextguardrail.blast import blast_radius
 from contextguardrail.cache import (
     already_sent,
     cache_key,
@@ -19,13 +20,17 @@ from contextguardrail.cache import (
     get_cache,
     replay_entries,
     remember_sent,
+    remember_topic,
     selected_files_hash,
     set_cache,
+    topic_entries,
 )
 from contextguardrail.budget import MODEL_COSTS
 from contextguardrail.config import DEFAULT_BUDGET, DEFAULT_MODEL, CODE_EXTENSIONS, CODE_FILENAMES, ensure_state, repo_root
 from contextguardrail.exporter import export_repo
+from contextguardrail.gitutils import file_authors, file_commit_count
 from contextguardrail.graph import graph_counts, load_graph
+from contextguardrail.optimizer import optimize_prompt
 from contextguardrail.policy import has_secret, redact_text
 from contextguardrail.scanner import index_repo
 from contextguardrail.selector import prompt_terms, select_context
@@ -102,6 +107,7 @@ def ask(
     if base_optimized == optimized_tokens or not replay:
         set_cache(root, key, "\n".join(lines))
     remember_sent(root, prompt, selected)
+    remember_topic(root, prompt, prompt_terms(prompt), selected)
     record_request(root, raw_tokens, optimized_tokens, cache_hit=False)
     console.print("\n".join(lines), markup=False)
 
@@ -183,6 +189,8 @@ def doctor(path: str = typer.Argument(".")):
     init_storage(root)
     with connect(root, "hashes.db") as db:
         indexed = db.execute("SELECT COUNT(*) AS count FROM files").fetchone()["count"]
+        expensive = db.execute("SELECT path, tokens FROM files ORDER BY tokens DESC LIMIT 5").fetchall()
+    stats_data = show_stats(root)
     console.print("ContextGuardrail Doctor")
     console.print(f"- Repo: {root}")
     console.print(f"- Indexed files: {indexed}")
@@ -191,7 +199,13 @@ def doctor(path: str = typer.Argument(".")):
     console.print(f"- Ignore file: {(root / '.contextguardrailignore').exists()}")
     console.print(f"- Policy file: {(root / '.contextguardrailpolicy.json').exists()}")
     console.print(f"- Tree-sitter available: {module_available('tree_sitter')}")
+    console.print(f"- Tree-sitter language pack available: {module_available('tree_sitter_language_pack')}")
     console.print(f"- Local embeddings available: {module_available('sentence_transformers')}")
+    console.print(f"- Requests tracked: {stats_data.get('requests', 0):,}")
+    console.print(f"- Input tokens saved: {stats_data.get('input_tokens_saved', 0):,}")
+    console.print("- Potential token hot spots:")
+    for row in expensive:
+        console.print(f"  - {row['path']}: {row['tokens']:,} tokens")
 
 
 @app.command()
@@ -209,6 +223,9 @@ def inspect(file: str, path: str = typer.Option(".", "--path", "-p")):
     console.print(f"File: {rel}")
     console.print(f"Tokens: {row['tokens']:,}")
     console.print(f"Hash: {row['hash']}")
+    console.print(f"Recent commits: {file_commit_count(root, rel)}")
+    authors = file_authors(root, rel)
+    console.print(f"Authors: {', '.join(authors) if authors else '-'}")
     console.print(f"Summary:\n{row['summary']}")
     if symbols:
         console.print(f"Imports: {symbols['imports'] or '-'}")
@@ -231,16 +248,119 @@ def related(file: str, path: str = typer.Option(".", "--path", "-p")):
         console.print(f"- {node}")
 
 
+@app.command("blast-radius")
+def blast_radius_command(file: str, path: str = typer.Option(".", "--path", "-p"), depth: int = typer.Option(2, "--depth")):
+    """Show dependency blast radius for a file."""
+    result = blast_radius(repo_root(path), Path(file).as_posix(), depth=depth)
+    console.print(json.dumps(result, indent=2))
+
+
+@app.command("optimize-prompt")
+def optimize_prompt_command(prompt: str, path: str = typer.Option(".", "--path", "-p")):
+    """Convert a vague prompt into an AI-ready task brief."""
+    selected, _ = select_context(repo_root(path), prompt)
+    console.print(optimize_prompt(prompt, selected), markup=False)
+
+
+@app.command()
+def router(prompt: str, path: str = typer.Option(".", "--path", "-p")):
+    """Suggest a model based on context size and task complexity."""
+    selected, raw_tokens = select_context(repo_root(path), prompt)
+    optimized = estimated_optimized_tokens(selected)
+    terms = prompt_terms(prompt)
+    if optimized < 2_000 and not {"architecture", "refactor", "security"} & terms:
+        model = "gpt-4o-mini"
+    elif {"architecture", "design", "refactor"} & terms or optimized > 8_000:
+        model = "claude-3-5-sonnet"
+    else:
+        model = "gpt-4o"
+    console.print(
+        json.dumps(
+            {
+                "recommended_model": model,
+                "raw_tokens": raw_tokens,
+                "optimized_tokens": optimized,
+                "estimated_cost": round(cost_usd(optimized, 1_000, model), 4),
+                "reason": "selected by context size, prompt complexity, and model cost profile",
+            },
+            indent=2,
+        )
+    )
+
+
+@app.command()
+def heatmap(path: str = typer.Argument(".")):
+    """Show expensive/high-churn context hot spots."""
+    root = repo_root(path)
+    with connect(root, "hashes.db") as db:
+        rows = db.execute("SELECT path, tokens FROM files ORDER BY tokens DESC LIMIT 20").fetchall()
+    table = Table(title="ContextGuardrail Heatmap")
+    table.add_column("File")
+    table.add_column("Tokens", justify="right")
+    table.add_column("Recent commits", justify="right")
+    table.add_column("Recommendation")
+    for row in rows:
+        commits = file_commit_count(root, row["path"])
+        recommendation = "create permanent summary" if row["tokens"] > 4_000 or commits > 10 else "normal"
+        table.add_row(row["path"], f"{row['tokens']:,}", str(commits), recommendation)
+    console.print(table)
+
+
+@app.command()
+def orchestrate(prompt: str, path: str = typer.Option(".", "--path", "-p")):
+    """Print a local planner/code/review/test orchestration plan."""
+    selected, _ = select_context(repo_root(path), prompt)
+    console.print("Planner -> Code Agent -> Review Agent -> Test Agent")
+    console.print(optimize_prompt(prompt, selected), markup=False)
+
+
+@app.command("langgraph-template")
+def langgraph_template():
+    """Print a LangGraph integration template."""
+    console.print(
+        """from contextguardrail.selector import select_context
+
+def context_node(state):
+    files, raw_tokens = select_context('.', state['prompt'])
+    return {**state, 'context_files': files, 'raw_tokens': raw_tokens}
+""",
+        markup=False,
+    )
+
+
+@app.command("neo4j-export")
+def neo4j_export(path: str = typer.Argument(".")):
+    """Export graph edges in a Neo4j-friendly Cypher file."""
+    root = repo_root(path)
+    graph = load_graph(root)
+    output = ensure_state(root) / "neo4j-import.cypher"
+    lines = []
+    for source, target in graph.edges():
+        lines.append(
+            "MERGE (a:File {path:%s}) MERGE (b:File {path:%s}) MERGE (a)-[:DEPENDS_ON]->(b);"
+            % (json.dumps(source), json.dumps(target))
+        )
+    output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    console.print(output)
+
+
 @app.command()
 def memory(path: str = typer.Argument(".")):
     """View replay prevention memory."""
-    entries = replay_entries(repo_root(path))
+    root = repo_root(path)
+    entries = replay_entries(root)
+    topics = topic_entries(root)
     if not entries:
         console.print("No replay memory yet.")
-        return
-    for entry in entries:
-        files = json.loads(entry["files"])
-        console.print(f"- {entry['created_at']} {entry['prompt_hash'][:12]}: {', '.join(files)}")
+    else:
+        console.print("Replay memory:")
+        for entry in entries:
+            files = json.loads(entry["files"])
+            console.print(f"- {entry['created_at']} {entry['prompt_hash'][:12]}: {', '.join(files)}")
+    if topics:
+        console.print("Topic memory:")
+        for topic in topics:
+            console.print(f"- hits={topic['hits']} terms={topic['terms']} files={topic['files']}")
 
 
 @app.command()

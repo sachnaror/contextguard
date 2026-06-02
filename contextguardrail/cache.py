@@ -46,6 +46,47 @@ def replay_entries(repo: str | Path) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def remember_topic(repo: str | Path, prompt: str, terms: set[str], files: list[dict]) -> None:
+    key = hashlib.sha256("|".join(sorted(terms)).encode()).hexdigest()
+    with connect(repo, "cache.db") as db:
+        ensure_topic_table(db)
+        db.execute(
+            """
+            INSERT INTO topic_memory(topic_key, prompt, terms, files, hits)
+            VALUES (?, ?, ?, ?, 1)
+            ON CONFLICT(topic_key) DO UPDATE SET
+              prompt=excluded.prompt,
+              terms=excluded.terms,
+              files=excluded.files,
+              hits=topic_memory.hits + 1,
+              updated_at=CURRENT_TIMESTAMP
+            """,
+            (key, prompt, json.dumps(sorted(terms)), json.dumps([item["path"] for item in files])),
+        )
+
+
+def topic_entries(repo: str | Path) -> list[dict]:
+    with connect(repo, "cache.db") as db:
+        ensure_topic_table(db)
+        rows = db.execute("SELECT topic_key, prompt, terms, files, hits, updated_at FROM topic_memory ORDER BY hits DESC, updated_at DESC").fetchall()
+    return [dict(row) for row in rows]
+
+
+def ensure_topic_table(db) -> None:
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS topic_memory(
+            topic_key TEXT PRIMARY KEY,
+            prompt TEXT NOT NULL,
+            terms TEXT NOT NULL,
+            files TEXT NOT NULL,
+            hits INTEGER NOT NULL DEFAULT 1,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+
 def remember_sent(repo: str | Path, prompt: str, files: list[dict]) -> None:
     file_hashes = {item["path"]: item["hash"] for item in files}
     with connect(repo, "cache.db") as db:

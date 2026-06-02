@@ -8,6 +8,7 @@ from typing import Any
 import networkx as nx
 
 from contextguardrail.storage import connect
+from contextguardrail.treesitter import parse_with_treesitter
 
 
 WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]+")
@@ -107,25 +108,26 @@ def parse_terraform(text: str) -> dict[str, list[str]]:
 
 
 def parse_file(path: Path, rel_path: str, text: str) -> dict[str, Any]:
-    data: dict[str, Any] = {"imports": [], "classes": [], "functions": []}
-    if path.suffix == ".py":
+    tree_sitter_data = parse_with_treesitter(path, text)
+    data: dict[str, Any] = tree_sitter_data or {"imports": [], "classes": [], "functions": []}
+    if not any(data.values()) and path.suffix == ".py":
         try:
             data = parse_python(text)
         except SyntaxError:
             pass
-    elif path.suffix in {".js", ".jsx", ".ts", ".tsx"}:
+    elif not any(data.values()) and path.suffix in {".js", ".jsx", ".ts", ".tsx"}:
         data = parse_javascript(text)
-    elif path.suffix == ".css":
+    elif not any(data.values()) and path.suffix == ".css":
         data = parse_css(text)
-    elif path.suffix == ".html":
+    elif not any(data.values()) and path.suffix == ".html":
         data = parse_html(text)
-    elif path.suffix == ".go":
+    elif not any(data.values()) and path.suffix == ".go":
         data = parse_go(text)
-    elif path.suffix == ".sql":
+    elif not any(data.values()) and path.suffix == ".sql":
         data = parse_sql(text)
-    elif path.suffix in {".yaml", ".yml"}:
+    elif not any(data.values()) and path.suffix in {".yaml", ".yml"}:
         data = parse_yaml(text)
-    elif path.suffix in {".tf", ".tfvars"}:
+    elif not any(data.values()) and path.suffix in {".tf", ".tfvars"}:
         data = parse_terraform(text)
     words = WORD_RE.findall(rel_path + " " + text[:8_000])
     symbols = data["imports"] + data["classes"] + data["functions"]
