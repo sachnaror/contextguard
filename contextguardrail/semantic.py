@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import os
 from collections import Counter
 from functools import lru_cache
 
@@ -40,16 +41,26 @@ def split_token(token: str) -> list[str]:
 
 
 def embedding_similarity(left: str, right: str) -> float | None:
+    model = embedding_model()
+    if model is None:
+        return None
     try:
-        model = embedding_model()
         vectors = model.encode([left, right], normalize_embeddings=True)
-        return float(sum(a * b for a, b in zip(vectors[0], vectors[1])))
     except Exception:
         return None
+    return float(sum(a * b for a, b in zip(vectors[0], vectors[1])))
 
 
 @lru_cache(maxsize=1)
 def embedding_model():
-    from sentence_transformers import SentenceTransformer
+    if os.environ.get("CONTEXTGUARDRAIL_USE_EMBEDDINGS") != "1":
+        return None
+    try:
+        from sentence_transformers import SentenceTransformer
+    except Exception:
+        return None
 
-    return SentenceTransformer("all-MiniLM-L6-v2")
+    try:
+        return SentenceTransformer("all-MiniLM-L6-v2", local_files_only=True)
+    except Exception:
+        return None

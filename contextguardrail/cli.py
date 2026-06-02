@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from html import escape
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -78,6 +79,7 @@ def ask(
     root = repo_root(path)
     base_selected, raw_tokens = select_context(root, prompt, budget=budget)
     base_optimized = estimated_optimized_tokens(base_selected)
+    direct_answer = direct_file_answer(prompt, base_selected)
     key = cache_key(prompt, selected_files_hash(base_selected), model)
     cached = get_cache(root, key)
     if cached is not None:
@@ -89,21 +91,24 @@ def ask(
     selected, raw_tokens = select_context(root, prompt, budget=budget, exclude_unchanged=replay)
     optimized_tokens = sum(max(30, min(item["tokens"], int(item["tokens"] * 0.25))) for item in selected)
 
-    lines = ["Files selected:", ""]
-    if selected:
-        lines.extend(format_selected_files(selected))
+    if direct_answer:
+        lines = [direct_answer]
     else:
-        lines.append("No changed files since this prompt was last sent.")
-    lines.extend(
-        [
-            "",
-            f"Raw Tokens: {raw_tokens:,}",
-            f"Optimized Tokens: {optimized_tokens:,}",
-            f"Savings: {savings_percent(raw_tokens, optimized_tokens):.1f}%",
-            f"Estimated Cost Saved: ${cost_usd(max(0, raw_tokens - optimized_tokens)):.4f}",
-        ]
-    )
-    lines.append("Cache: miss")
+        lines = ["Files selected:", ""]
+        if selected:
+            lines.extend(format_selected_files(selected))
+        else:
+            lines.append("No changed files since this prompt was last sent.")
+        lines.extend(
+            [
+                "",
+                f"Raw Tokens: {raw_tokens:,}",
+                f"Optimized Tokens: {optimized_tokens:,}",
+                f"Savings: {savings_percent(raw_tokens, optimized_tokens):.1f}%",
+                f"Estimated Cost Saved: ${cost_usd(max(0, raw_tokens - optimized_tokens)):.4f}",
+            ]
+        )
+        lines.append("Cache: miss")
     if base_optimized == optimized_tokens or not replay:
         set_cache(root, key, "\n".join(lines))
     remember_sent(root, prompt, selected)
@@ -200,7 +205,10 @@ def doctor(path: str = typer.Argument(".")):
     console.print(f"- Policy file: {(root / '.contextguardrailpolicy.json').exists()}")
     console.print(f"- Tree-sitter available: {module_available('tree_sitter')}")
     console.print(f"- Tree-sitter language pack available: {module_available('tree_sitter_language_pack')}")
-    console.print(f"- Local embeddings available: {module_available('sentence_transformers')}")
+    embeddings_installed = module_available("sentence_transformers")
+    embeddings_enabled = os.environ.get("CONTEXTGUARDRAIL_USE_EMBEDDINGS") == "1"
+    console.print(f"- Local embeddings installed: {embeddings_installed}")
+    console.print(f"- Local embeddings enabled: {embeddings_enabled}")
     console.print(f"- Requests tracked: {stats_data.get('requests', 0):,}")
     console.print(f"- Input tokens saved: {stats_data.get('input_tokens_saved', 0):,}")
     console.print("- Potential token hot spots:")
@@ -519,6 +527,29 @@ def savings_percent(raw_tokens: int, optimized_tokens: int) -> float:
     if raw_tokens <= 0:
         return 0.0
     return max(0.0, (raw_tokens - optimized_tokens) / raw_tokens * 100)
+
+
+def direct_file_answer(prompt: str, files: list[dict]) -> str | None:
+    """Return a terse answer for simple file lookup questions."""
+    if not files:
+        return None
+    text = prompt.lower()
+    asks_for_file = "file" in text or "page" in text
+    looks_like_lookup = asks_for_file and any(word in text for word in ("which", "where", "what"))
+    action_words = (
+        "add",
+        "build",
+        "change",
+        "create",
+        "debug",
+        "fix",
+        "implement",
+        "refactor",
+        "update",
+    )
+    if not looks_like_lookup or any(word in text for word in action_words):
+        return None
+    return f"Answer: {files[0]['path']}"
 
 
 def estimated_optimized_tokens(files: list[dict]) -> int:

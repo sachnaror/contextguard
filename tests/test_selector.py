@@ -1,4 +1,17 @@
 from contextguardrail.selector import prompt_terms, prune_weak_matches, score_row
+from contextguardrail.cli import direct_file_answer
+
+
+def test_direct_file_answer_for_simple_lookup():
+    files = [{"path": "contact.html"}]
+
+    assert direct_file_answer("Which HTML file contains the contact form?", files) == "Answer: contact.html"
+
+
+def test_direct_file_answer_ignores_change_requests():
+    files = [{"path": "contact.html"}]
+
+    assert direct_file_answer("Update the contact form page", files) is None
 
 
 def test_style_prompt_prefers_css_over_weak_html_matches():
